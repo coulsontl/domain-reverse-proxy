@@ -2,6 +2,7 @@
 build/
 logs/
 data/
+.history
 
 .env
 dist/
