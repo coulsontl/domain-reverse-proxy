@@ -232,7 +232,8 @@ jobs:
 
   build:
     name: Build
-    needs: [amd64_build, x86_build, arm64_build, ppc64le_build, armv7_build]
+    # needs: [amd64_build, x86_build, arm64_build, ppc64le_build, armv7_build]
+    needs: [amd64_build, x86_build, arm64_build, ppc64le_build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout base
