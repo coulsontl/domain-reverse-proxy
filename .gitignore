@@ -1,0 +1,8 @@
+.idea
+build/
+logs/
+data/
+
+.env
+dist/
+.DS_Store

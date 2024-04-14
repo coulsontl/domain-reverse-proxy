@@ -1,0 +1,5 @@
+flask
+aiohttp
+python-dotenv
+brotli
+beautifulsoup4

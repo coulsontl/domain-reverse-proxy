@@ -1,0 +1,15 @@
+# version: '3'
+services:
+  reverse-proxy:
+    container_name: reverse-proxy
+    image: coulsontl/domain-reverse-proxy
+    network_mode: bridge
+    restart: always
+    ports:
+      - '5000:5000'
+      - '5001:5001'
+    environment:
+      - TZ=Asia/Shanghai
+      - PROXY_URL=http://user:password@yourproxy:port
+      - TARGET_URLS="https://site1.com,https://site2.com"
+      - SERVER_PORTS=5000,5001
