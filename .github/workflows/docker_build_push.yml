@@ -21,9 +21,10 @@ jobs:
             os: ubuntu-latest
           - platform: linux/386
             os: ubuntu-latest
-          - platform: linux/arm/v7
+          - platform: linux/ppc64le
             os: ubuntu-latest
-            # os: [self-hosted, linux, ARM]
+          # - platform: linux/arm/v7
+          #   os: ubuntu-latest
           - platform: linux/arm64
             os: ubuntu-latest
             # os: [self-hosted, linux, ARM64]
