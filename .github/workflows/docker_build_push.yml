@@ -67,7 +67,7 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           context: .
-          dockerfile: ./scripts/Dockerfile
+          file: ./scripts/Dockerfile
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             SHA=${{ steps.vars.outputs.sha_short }}
