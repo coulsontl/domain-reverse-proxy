@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY_IMAGE: coulsontl/domain-reverse-proxy
+  REGISTRY_IMAGE: ${{ secrets.DOCKERHUB_PROJECT }}
 
 jobs:
   build:
