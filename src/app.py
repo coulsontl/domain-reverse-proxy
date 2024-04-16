@@ -19,27 +19,66 @@ proxy_url = os.getenv('PROXY_URL')
 target_urls = os.getenv('TARGET_URLS').split(',')
 server_ports = list(map(int, os.getenv('SERVER_PORTS').split(',')))
 
+async def should_use_stream(request, full_path):
+    if 'stream' in request.query and request.query['stream'].lower() == 'true':
+        return True
+    if full_path.endswith(':streamGenerateContent'):
+        return True
+    if request.method == 'POST' and request.content_type == 'application/json':
+        try:
+            body = await request.json()  # 异步读取JSON请求体
+            return body.get('stream', False)  # 假设请求体中包含stream字段
+        except json.JSONDecodeError:
+            logging.error("Error decoding JSON request body.")
+            return False
+    return False
+
 async def proxy(request):
     path = request.match_info.get('path', '/')
     port = request.transport.get_extra_info('sockname')[1]  # 获取实际监听的端口号
     target_url = target_urls[server_ports.index(port)]
-
-    logging.info(f"Forwarding request from port {port} to {target_url}/{path}")
+    if target_url.endswith('/'):
+        target_url = target_url[:-1]
+    full_path = str(request.rel_url)
+    if full_path.startswith('/'):
+        full_path = full_path[1:]
+    
+    # 检查是否需要流式输出
+    stream = await should_use_stream(request, full_path)
 
     async with ClientSession() as session:
-        target = f"{target_url}/{path}"
+        if len(full_path):
+            target = f"{target_url}/{full_path}"
+        else:
+            target = target_url
+        logging.info(f"Forwarding stream:{stream} request from port {port} to {target}")
+        
         headers = {key: value for (key, value) in request.headers.items() if key != 'Host'}
         try:
             async with session.request(
                 request.method, target, headers=headers, data=await request.read(), 
                 proxy=proxy_url, allow_redirects=False
             ) as resp:
-                raw = await resp.read()
+                if stream:
+                    # 如果需要流式输出
+                    response = web.StreamResponse(status=resp.status, reason=resp.reason)
+                    headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'content-length', 'transfer-encoding', 'connection')]
+                    for name, value in headers:
+                        response.headers[name] = value
+                    await response.prepare(request)
 
-                # 构建返回结果
-                headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'content-length', 'transfer-encoding', 'connection')]
-                logging.info(f"Request to {target} successful with status {resp.status}")
-                return web.Response(body=raw, status=resp.status, headers=headers)
+                    async for data, _ in resp.content.iter_chunks():
+                        await response.write(data)
+
+                    await response.write_eof()
+                    return response
+                else:
+                    raw = await resp.read()
+
+                    # 构建返回结果
+                    headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'content-length', 'transfer-encoding', 'connection')]
+                    logging.info(f"Request to {target} successful with status {resp.status}")
+                    return web.Response(body=raw, status=resp.status, headers=headers)
         except Exception as e:
             logging.error(f"Error during request to {target}: {e}")
             return web.Response(status=502, text="Bad Gateway")
