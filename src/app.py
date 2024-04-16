@@ -88,7 +88,6 @@ async def proxy(request):
                     if resp.status != 200:
                         logging.error(f"Request to {target} completed with status {resp.status}. "
                                       f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
-                        logging.error(f"Response content (truncated): {response_content[:500].decode('utf-8', errors='replace')}")
                     else:
                         logging.info(f"Request to {target} successful with status {resp.status}")
                     return web.Response(body=raw, status=resp.status, headers=headers)
