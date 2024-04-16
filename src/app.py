@@ -36,12 +36,8 @@ async def should_use_stream(request, full_path):
 async def proxy(request):
     path = request.match_info.get('path', '/')
     port = request.transport.get_extra_info('sockname')[1]  # 获取实际监听的端口号
-    target_url = target_urls[server_ports.index(port)]
-    if target_url.endswith('/'):
-        target_url = target_url[:-1]
-    full_path = str(request.rel_url)
-    if full_path.startswith('/'):
-        full_path = full_path[1:]
+    target_url = target_urls[server_ports.index(port)].rstrip('/')
+    full_path = str(request.rel_url).lstrip('/')
     
     # 检查是否需要流式输出
     stream = await should_use_stream(request, full_path)
@@ -53,10 +49,12 @@ async def proxy(request):
             target = target_url
         logging.info(f"Forwarding stream:{stream} request from port {port} to {target}")
         
-        headers = {key: value for (key, value) in request.headers.items() if key != 'Host'}
+        request_body = await request.read()
+        request_headers = {key: value for (key, value) in request.headers.items() if key != 'Host'}
+        # logging.info(f"Headers={headers}")
         try:
             async with session.request(
-                request.method, target, headers=headers, data=await request.read(), 
+                request.method, target, headers=request_headers, data=await request.read(), 
                 proxy=proxy_url, allow_redirects=False
             ) as resp:
                 if stream:
@@ -67,17 +65,30 @@ async def proxy(request):
                         response.headers[name] = value
                     await response.prepare(request)
 
+                    response_content = bytearray()
                     async for data, _ in resp.content.iter_chunks():
                         await response.write(data)
+                        response_content.extend(data)
 
                     await response.write_eof()
+                    if resp.status != 200:
+                        logging.error(f"Request to {target} completed with status {resp.status}. "
+                                      f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
+                        logging.error(f"Response content (truncated): {response_content[:500].decode('utf-8', errors='replace')}")
+                    else:
+                        logging.info(f"Request to {target} completed with status {resp.status}")
                     return response
                 else:
                     raw = await resp.read()
 
                     # 构建返回结果
                     headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'content-length', 'transfer-encoding', 'connection')]
-                    logging.info(f"Request to {target} successful with status {resp.status}")
+                    if resp.status != 200:
+                        logging.error(f"Request to {target} completed with status {resp.status}. "
+                                      f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
+                        logging.error(f"Response content (truncated): {response_content[:500].decode('utf-8', errors='replace')}")
+                    else:
+                        logging.info(f"Request to {target} successful with status {resp.status}")
                     return web.Response(body=raw, status=resp.status, headers=headers)
         except Exception as e:
             logging.error(f"Error during request to {target}: {e}")
