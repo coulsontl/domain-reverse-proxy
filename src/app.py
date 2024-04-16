@@ -6,6 +6,8 @@ import logging
 import gzip
 import brotli
 import zlib
+from urllib.parse import urlparse
+import json
 from bs4 import BeautifulSoup
 
 # 加载环境变量
@@ -43,15 +45,15 @@ async def proxy(request):
     stream = await should_use_stream(request, full_path)
 
     async with ClientSession() as session:
-        if len(full_path):
-            target = f"{target_url}/{full_path}"
-        else:
-            target = target_url
+        target = f"{target_url}/{full_path}"
         logging.info(f"Forwarding stream:{stream} request from port {port} to {target}")
         
+        # 解析目标URL以获取Host
+        parsed_target_url = urlparse(target)
+        target_host = parsed_target_url.netloc
+        
         request_body = await request.read()
-        request_headers = {key: value for (key, value) in request.headers.items() if key != 'Host'}
-        # logging.info(f"Headers={headers}")
+        request_headers = {key: (target_host if key == 'Host' else value) for key, value in request.headers.items()}
         try:
             async with session.request(
                 request.method, target, headers=request_headers, data=await request.read(), 
