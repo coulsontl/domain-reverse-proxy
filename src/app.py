@@ -21,21 +21,10 @@ proxy_url = os.getenv('PROXY_URL')
 target_urls = os.getenv('TARGET_URLS').split(',')
 server_ports = list(map(int, os.getenv('SERVER_PORTS').split(',')))
 
-# 配置TCP连接器，限制最大连接数
-connector = TCPConnector(limit=600)
-
-async def should_use_stream(request, full_path):
-    if 'stream' in request.query and request.query['stream'].lower() == 'true':
+async def should_use_stream(resp):
+    # 如果没有Content-Length头或Transfer-Encoding为chunked，视为流式响应
+    if 'Content-Length' not in resp.headers or resp.headers.get('Transfer-Encoding') == 'chunked':
         return True
-    if full_path.endswith(':streamGenerateContent'):
-        return True
-    if request.method == 'POST' and request.content_type == 'application/json':
-        try:
-            body = await request.json()  # 异步读取JSON请求体
-            return body.get('stream', False)  # 假设请求体中包含stream字段
-        except json.JSONDecodeError:
-            logging.error("Error decoding JSON request body.")
-            return False
     return False
 
 async def proxy(request):
@@ -44,12 +33,9 @@ async def proxy(request):
     target_url = target_urls[server_ports.index(port)].rstrip('/')
     full_path = str(request.rel_url).lstrip('/')
     
-    # 检查是否需要流式输出
-    stream = await should_use_stream(request, full_path)
-
-    async with ClientSession(connector=connector) as session:
+    async with ClientSession() as session:
         target = f"{target_url}/{full_path}"
-        logging.info(f"Forwarding stream:{stream} request from port {port} to {target}")
+        logging.info(f"Forwarding request from port {port} to {target}")
         
         # 解析目标URL以获取Host
         parsed_target_url = urlparse(target)
@@ -62,6 +48,7 @@ async def proxy(request):
                 request.method, target, headers=request_headers, data=await request.read(), 
                 proxy=proxy_url, allow_redirects=False
             ) as resp:
+                stream = await should_use_stream(resp)
                 if stream:
                     # 如果需要流式输出
                     response = web.StreamResponse(status=resp.status, reason=resp.reason)
@@ -77,11 +64,11 @@ async def proxy(request):
 
                     await response.write_eof()
                     if resp.status != 200:
-                        logging.error(f"Request to {target} completed with status {resp.status}. "
+                        logging.error(f"Request to {target} stream: {stream} completed with status {resp.status}. "
                                       f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
                         logging.error(f"Response content (truncated): {response_content[:500].decode('utf-8', errors='replace')}")
                     else:
-                        logging.info(f"Request to {target} completed with status {resp.status}")
+                        logging.info(f"Request to {target} stream: {stream} completed with status {resp.status}")
                     return response
                 else:
                     raw = await resp.read()
@@ -89,10 +76,11 @@ async def proxy(request):
                     # 构建返回结果
                     headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'content-length', 'transfer-encoding', 'connection')]
                     if resp.status != 200:
-                        logging.error(f"Request to {target} completed with status {resp.status}. "
+                        logging.error(f"Request to {target} stream: {stream} completed with status {resp.status}. "
                                       f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
+                        logging.error(f"Response content: {raw.decode('utf-8', errors='replace')}")
                     else:
-                        logging.info(f"Request to {target} successful with status {resp.status}")
+                        logging.info(f"Request to {target} stream: {stream} successful with status {resp.status}")
                     return web.Response(body=raw, status=resp.status, headers=headers)
         except Exception as e:
             logging.error(f"Error during request to {target}: {e}")
