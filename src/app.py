@@ -41,11 +41,11 @@ async def proxy(request):
         parsed_target_url = urlparse(target)
         target_host = parsed_target_url.netloc
         
-        request_body = await request.read()
-        request_headers = {key: (target_host if key == 'Host' else value) for key, value in request.headers.items()}
+        request_headers = {key: (target_host if key.lower() == 'host' else value) for key, value in request.headers.items() if key.lower() != 'transfer-encoding'}
+        # logging.info(f"Request headers: {request_headers}")
         try:
             async with session.request(
-                request.method, target, headers=request_headers, data=await request.read(), 
+                request.method, target, headers=request_headers, data=request.content, 
                 proxy=proxy_url, allow_redirects=False
             ) as resp:
                 stream = await should_use_stream(resp)
@@ -65,7 +65,7 @@ async def proxy(request):
                     await response.write_eof()
                     if resp.status != 200:
                         logging.error(f"Request to {target} stream: {stream} completed with status {resp.status}. "
-                                      f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
+                                      f"Headers={request_headers}")
                         logging.error(f"Response content (truncated): {response_content[:500].decode('utf-8', errors='replace')}")
                     else:
                         logging.info(f"Request to {target} stream: {stream} completed with status {resp.status}")
@@ -77,7 +77,7 @@ async def proxy(request):
                     headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'content-length', 'transfer-encoding', 'connection')]
                     if resp.status != 200:
                         logging.error(f"Request to {target} stream: {stream} completed with status {resp.status}. "
-                                      f"Headers={request_headers}, Body={request_body.decode('utf-8', errors='replace')}, ")
+                                      f"Headers={request_headers}")
                         logging.error(f"Response content: {raw.decode('utf-8', errors='replace')}")
                     else:
                         logging.info(f"Request to {target} stream: {stream} successful with status {resp.status}")
