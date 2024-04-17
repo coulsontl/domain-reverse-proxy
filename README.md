@@ -18,7 +18,7 @@ services:
       - TZ=Asia/Shanghai
       - PROXY_URL=http://user:password@yourproxy:port
       - SERVER_PORT_5000=https://site1.com
-      - SERVER_PORT_5001=https://site1.com
+      - SERVER_PORT_5001=https://site2.com
 ```
 
 ### 环境变量说明
