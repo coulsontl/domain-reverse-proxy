@@ -1,6 +1,6 @@
 import os
 import asyncio
-from aiohttp import web, ClientSession
+from aiohttp import web, TCPConnector, ClientSession
 from dotenv import load_dotenv
 import logging
 import gzip
@@ -20,6 +20,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 proxy_url = os.getenv('PROXY_URL')
 target_urls = os.getenv('TARGET_URLS').split(',')
 server_ports = list(map(int, os.getenv('SERVER_PORTS').split(',')))
+
+# 配置TCP连接器，限制最大连接数
+connector = TCPConnector(limit=600)
 
 async def should_use_stream(request, full_path):
     if 'stream' in request.query and request.query['stream'].lower() == 'true':
@@ -44,7 +47,7 @@ async def proxy(request):
     # 检查是否需要流式输出
     stream = await should_use_stream(request, full_path)
 
-    async with ClientSession() as session:
+    async with ClientSession(connector=connector) as session:
         target = f"{target_url}/{full_path}"
         logging.info(f"Forwarding stream:{stream} request from port {port} to {target}")
         
