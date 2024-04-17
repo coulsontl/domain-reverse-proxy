@@ -18,8 +18,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # 读取环境变量
 proxy_url = os.getenv('PROXY_URL')
-target_urls = os.getenv('TARGET_URLS').split(',')
-server_ports = list(map(int, os.getenv('SERVER_PORTS').split(',')))
+
+# 新的方式读取端口和目标URL的对应关系
+port_to_target_url = {}
+for key, value in os.environ.items():
+    if key.startswith('SERVER_PORT_'):
+        port = int(key.split('_PORT_')[1])
+        port_to_target_url[port] = value
 
 async def should_use_stream(resp):
     # 如果没有Content-Length头或Transfer-Encoding为chunked，视为流式响应
@@ -30,7 +35,7 @@ async def should_use_stream(resp):
 async def proxy(request):
     path = request.match_info.get('path', '/')
     port = request.transport.get_extra_info('sockname')[1]  # 获取实际监听的端口号
-    target_url = target_urls[server_ports.index(port)].rstrip('/')
+    target_url = port_to_target_url[port].rstrip('/')
     full_path = str(request.rel_url).lstrip('/')
     
     async with ClientSession() as session:
@@ -96,7 +101,7 @@ async def start_proxy(port):
     logging.info(f"Proxy server started on port {port}")
 
 async def main():
-    await asyncio.gather(*(start_proxy(port) for port in server_ports))
+    await asyncio.gather(*(start_proxy(port) for port in port_to_target_url.keys()))
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

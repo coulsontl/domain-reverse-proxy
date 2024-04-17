@@ -11,5 +11,5 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - PROXY_URL=http://user:password@yourproxy:port
-      - TARGET_URLS="https://site1.com,https://site2.com"
-      - SERVER_PORTS=5000,5001
+      - SERVER_PORT_5000=https://site1.com
+      - SERVER_PORT_5001=https://site1.com

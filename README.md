@@ -17,17 +17,17 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - PROXY_URL=http://user:password@yourproxy:port
-      - TARGET_URLS="https://site1.com,https://site2.com"
-      - SERVER_PORTS=5000,5001
+      - SERVER_PORT_5000=https://site1.com
+      - SERVER_PORT_5001=https://site1.com
 ```
 
 ### 环境变量说明
-* PROXY_URL: 指定所有请求通过的代理服务器的URL。
-* TARGET_URLS: 以逗号分隔的目标网站URL列表，每个端口对应一个URL。
-* SERVER_PORTS: 以逗号分隔的监听端口列表，数量应与TARGET_URLS中的URL数量匹配。
+* PROXY_URL: 指定所有请求通过的代理服务器的URL
+* SERVER_PORT_5000: 必须以SERVER_PORT_开头，5000代表监听的端口，值对应的是目标网站URL
+* 如果有多个反代站点直接添加多个以SERVER_PORT_开头的环境变量就行了
 
 ### 端口映射
-使用 -p 标志映射容器内的端口到宿主机的端口。确保每个SERVER_PORTS中指定的端口都被映射。
+使用 -p 标志映射容器内的端口到宿主机的端口。确保每个SERVER_PORT指定的端口都被映射。
 
 ### 验证运行
 如果您映射了端口5000到宿主机，并配置了相应的目标URL，那么访问 http://localhost:5000 应该会看到目标网站的内容。
